@@ -1,2 +1,2 @@
-include ':app', ':ui'
+include ':app', ':uiview', ':common'
 rootProject.name='My Application'
