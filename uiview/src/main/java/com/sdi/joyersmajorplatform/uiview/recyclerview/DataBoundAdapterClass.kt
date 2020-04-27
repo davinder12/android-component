@@ -93,6 +93,7 @@ abstract class DataBoundAdapterClass<T, V : ViewDataBinding>(diffUtil: DiffUtil.
     open fun map(binding: V): T? {
         // TODO: log
         return null
+
     }
 
 }
