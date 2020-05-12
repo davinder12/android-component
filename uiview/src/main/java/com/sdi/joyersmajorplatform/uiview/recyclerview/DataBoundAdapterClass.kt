@@ -127,10 +127,14 @@ abstract class DataBoundAdapterClass<T, V : ViewDataBinding>(diffUtil: DiffUtil.
 
 
 
-
-    override fun getItemViewType(position: Int): Int {
-        return getCustomItemViewType(position)
+    final override fun getItemViewType(position: Int): Int {
+        return if (isLoadingAtFront() && position == 0) {
+            DataBoundPagedListAdapter.FRONT_LOADING_INDICATOR
+        } else {
+            getCustomItemViewType(position)
+        }
     }
+
 
     abstract fun bind(bind: V, itemType: T?, position: Int)
 
