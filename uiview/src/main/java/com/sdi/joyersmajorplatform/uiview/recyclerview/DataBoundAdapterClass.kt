@@ -164,4 +164,15 @@ abstract class DataBoundAdapterClass<T, V : ViewDataBinding>(diffUtil: DiffUtil.
 
     }
 
+    override fun getItemCount(): Int {
+        return super.getItemCount() + getExtraRows()
+    }
+
+    private fun getExtraRows(): Int {
+        var count = 0
+        if (isLoadingAtFront()) ++count
+        return count
+    }
+
+
 }
