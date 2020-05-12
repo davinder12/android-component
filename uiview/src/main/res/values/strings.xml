@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">uiview</string>
+    <string name="NetworkState_retry">Retry</string>
+    <string name="EmptyRecyclerView_defaultText">No item Found.</string>
+
+
 </resources>
