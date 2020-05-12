@@ -9,6 +9,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import com.sdi.joyersmajorplatform.uiview.NetworkState
+import com.sdi.joyersmajorplatform.uiview.R
 import com.sdi.joyersmajorplatform.uiview.databinding.NetworkStateItemBinding
 import io.reactivex.Observable
 import io.reactivex.subjects.PublishSubject
@@ -37,6 +38,9 @@ abstract class DataBoundAdapterClass<T, V : ViewDataBinding>(diffUtil: DiffUtil.
 
     protected val retryClickSource = PublishSubject.create<NetworkState>()
     val retryClicks: Observable<NetworkState> = retryClickSource.throttleFirst(clickThrottle, TimeUnit.MILLISECONDS)
+
+    @LayoutRes
+    private val networkStateRes = R.layout.network_state_item
 
 
 
