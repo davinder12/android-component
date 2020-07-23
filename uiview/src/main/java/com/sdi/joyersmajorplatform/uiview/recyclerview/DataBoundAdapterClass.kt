@@ -5,7 +5,6 @@ import android.view.ViewGroup
 import androidx.annotation.LayoutRes
 import androidx.databinding.DataBindingUtil
 import androidx.databinding.ViewDataBinding
-import androidx.lifecycle.LifecycleOwner
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import com.sdi.joyersmajorplatform.uiview.NetworkState
@@ -15,22 +14,21 @@ import io.reactivex.Observable
 import io.reactivex.subjects.PublishSubject
 import java.util.concurrent.TimeUnit
 
-abstract class DataBoundAdapterClass<T, V : ViewDataBinding>(diffUtil: DiffUtil.ItemCallback<T>,
-                                                             private val enableClicks: Boolean = true,
-                                                             private val frontLoadingIndicator: Boolean = true,
-                                                             var lifecycleOwner: LifecycleOwner? = null
-                                                             ) :
-    ListAdapter<T, DataBoundViewHolder<*>>(diffUtil) ,IAdapter<T>{
-    
+abstract class DataBoundAdapterClass<T, V : ViewDataBinding>(
+    diffUtil: DiffUtil.ItemCallback<T>,
+    private val enableClicks: Boolean = true
+) :
+    ListAdapter<T, DataBoundViewHolder<*>>(diffUtil), IAdapter<T> {
+
     companion object {
         const val DEFAULT_LAYOUT = 84740
-        const val FRONT_LOADING_INDICATOR = 84741
+        const val LOADING_INDICATOR = 84741
     }
 
     private val clickThrottle: Long = 500L
 
 
-    private var frontLoadingState: NetworkState? = null
+    private var networkState: NetworkState? = null
 
 
     private val clickSource = PublishSubject.create<T>()
@@ -42,12 +40,10 @@ abstract class DataBoundAdapterClass<T, V : ViewDataBinding>(diffUtil: DiffUtil.
     @LayoutRes
     private val networkStateRes = R.layout.network_state_item
 
-
-
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): DataBoundViewHolder<*> {
         return when (viewType) {
             DEFAULT_LAYOUT -> DataBoundViewHolder(createBinding(parent, defaultLayoutRes))
-            FRONT_LOADING_INDICATOR-> DataBoundViewHolder(createNetworkBinding(parent))
+            LOADING_INDICATOR -> DataBoundViewHolder(createNetworkBinding(parent))
             else -> DataBoundViewHolder(createBinding(parent, getLayoutForViewType(viewType)))
         }
     }
@@ -66,36 +62,26 @@ abstract class DataBoundAdapterClass<T, V : ViewDataBinding>(diffUtil: DiffUtil.
     }
 
     override fun onBindViewHolder(holder: DataBoundViewHolder<*>, position: Int) {
-        holder.binding.lifecycleOwner = lifecycleOwner
         when (getItemViewType(position)) {
-            FRONT_LOADING_INDICATOR -> (holder.binding as NetworkStateItemBinding).item = frontLoadingState
-            else -> {
-                val actualPosition = if (isLoadingAtFront()) position - 1 else position
-                bind(holder.binding as V, getItem(actualPosition), position)
-                holder.binding.executePendingBindings()
-            }
+            LOADING_INDICATOR -> (holder.binding as NetworkStateItemBinding).item = networkState
+            else -> bind(holder.binding as V, getItem(position), position)
         }
     }
 
-    private fun isLoadingAtFront() =
-        frontLoadingState != null && frontLoadingState != NetworkState.success
 
-
-
-    open fun updateFrontLoadingState(newPagingState: NetworkState?) {
-        if (!frontLoadingIndicator) return
-        val previousState = this.frontLoadingState
-        val hadExtraRow = isLoadingAtFront()
-        this.frontLoadingState = newPagingState
-        val hasExtraRow = isLoadingAtFront()
+    fun setNetworkState(newNetworkState: NetworkState?) {
+        val previousState = this.networkState
+        val hadExtraRow = hasExtraRow()
+        this.networkState = newNetworkState
+        val hasExtraRow = hasExtraRow()
         if (hadExtraRow != hasExtraRow) {
             if (hadExtraRow) {
-                notifyItemRemoved(0)
+                notifyItemRemoved(super.getItemCount())
             } else {
-                notifyItemInserted(0)
+                notifyItemInserted(super.getItemCount())
             }
-        } else if (hasExtraRow && previousState != newPagingState) {
-            notifyItemChanged(0)
+        } else if (hasExtraRow && previousState != newNetworkState) {
+            notifyItemChanged(itemCount - 1)
         }
     }
 
@@ -128,8 +114,8 @@ abstract class DataBoundAdapterClass<T, V : ViewDataBinding>(diffUtil: DiffUtil.
 
 
     final override fun getItemViewType(position: Int): Int {
-        return if (isLoadingAtFront() && position == 0) {
-            DataBoundPagedListAdapter.FRONT_LOADING_INDICATOR
+        return if (hasExtraRow() && position == itemCount - 1) {
+            LOADING_INDICATOR
         } else {
             getCustomItemViewType(position)
         }
@@ -165,14 +151,10 @@ abstract class DataBoundAdapterClass<T, V : ViewDataBinding>(diffUtil: DiffUtil.
     }
 
     override fun getItemCount(): Int {
-        return super.getItemCount() + getExtraRows()
+        return super.getItemCount() + if (hasExtraRow()) 1 else 0
     }
 
-    private fun getExtraRows(): Int {
-        var count = 0
-        if (isLoadingAtFront()) ++count
-        return count
-    }
+    private fun hasExtraRow() = networkState != null && networkState != NetworkState.success
 
 
 }

@@ -17,3 +17,10 @@ fun showHide(view: View, show: Boolean) {
 fun hideShow(view: View, show: Boolean) {
     view.visibility = if (show) View.GONE else View.VISIBLE
 }
+
+
+@BindingAdapter("invisibleShow")
+fun invisibleShow(view: View, show: Boolean) {
+    view.visibility = if (show) View.INVISIBLE else View.VISIBLE
+}
+

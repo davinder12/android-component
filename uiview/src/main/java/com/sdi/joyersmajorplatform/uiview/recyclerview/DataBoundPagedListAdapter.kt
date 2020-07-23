@@ -5,7 +5,6 @@ import android.view.ViewGroup
 import androidx.annotation.LayoutRes
 import androidx.databinding.DataBindingUtil
 import androidx.databinding.ViewDataBinding
-import androidx.lifecycle.LifecycleOwner
 import androidx.paging.PagedListAdapter
 import androidx.recyclerview.widget.DiffUtil
 import com.sdi.joyersmajorplatform.uiview.NetworkState
@@ -16,16 +15,13 @@ import io.reactivex.subjects.PublishSubject
 import java.util.concurrent.TimeUnit
 
 abstract class DataBoundPagedListAdapter<T, V : ViewDataBinding>(diffUtil: DiffUtil.ItemCallback<T>,
-                                                                 private val endLoadingIndicator: Boolean = true,
-                                                                 var lifecycleOwner: LifecycleOwner? = null,
-                                                                 private val frontLoadingIndicator: Boolean = true,
                                                                  private val enableClicks: Boolean = true) :
     PagedListAdapter<T, DataBoundViewHolder<*>>(diffUtil) , IAdapter<T> {
 
+
     companion object {
         const val DEFAULT_LAYOUT = 84740
-        const val FRONT_LOADING_INDICATOR = 84741
-        const val END_LOADING_INDICATOR = 84742
+        const val LOADING_INDICATOR = 84742
     }
 
     private var endLoadingState: NetworkState? = null
@@ -37,6 +33,7 @@ abstract class DataBoundPagedListAdapter<T, V : ViewDataBinding>(diffUtil: DiffU
     @LayoutRes
     private val networkStateRes = R.layout.network_state_item
 
+    private var networkState: NetworkState? = null
 
     private val clickSource = PublishSubject.create<T>()
     override val clicks: Observable<T> = clickSource.throttleFirst(500, TimeUnit.MILLISECONDS)
@@ -48,26 +45,15 @@ abstract class DataBoundPagedListAdapter<T, V : ViewDataBinding>(diffUtil: DiffU
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): DataBoundViewHolder<*> {
         return when (viewType) {
             DEFAULT_LAYOUT -> DataBoundViewHolder(createBinding(parent, defaultLayoutRes))
-            FRONT_LOADING_INDICATOR, END_LOADING_INDICATOR -> DataBoundViewHolder(
-                createNetworkBinding(parent)
-            )
+            LOADING_INDICATOR -> DataBoundViewHolder(createNetworkBinding(parent))
             else -> DataBoundViewHolder(createBinding(parent, getLayoutForViewType(viewType)))
         }
     }
 
     override fun onBindViewHolder(holder: DataBoundViewHolder<*>, position: Int) {
-        holder.binding.lifecycleOwner = lifecycleOwner
         when (getItemViewType(position)) {
-            FRONT_LOADING_INDICATOR -> {
-                (holder.binding as NetworkStateItemBinding).item = frontLoadingState
-            }
-            END_LOADING_INDICATOR -> {
-                (holder.binding as NetworkStateItemBinding).item = endLoadingState
-            }
-            else -> {
-                val actualPosition = if (isLoadingAtFront()) position - 1 else position
-                bind(holder.binding as V, getItem(actualPosition), position)
-            }
+            LOADING_INDICATOR -> (holder.binding as NetworkStateItemBinding).item = networkState
+            else -> bind(holder.binding as V, getItem(position), position)
         }
     }
 
@@ -83,6 +69,7 @@ abstract class DataBoundPagedListAdapter<T, V : ViewDataBinding>(diffUtil: DiffU
         }
         return binding
     }
+
 
     /**
      * Override this to customize the view binding
@@ -111,64 +98,31 @@ abstract class DataBoundPagedListAdapter<T, V : ViewDataBinding>(diffUtil: DiffU
     }
 
 
-    private fun isLoadingAtEnd() =
-        endLoadingState != null && endLoadingState != NetworkState.success
-
-    private fun isLoadingAtFront() =
-        frontLoadingState != null && frontLoadingState != NetworkState.success
-
-
-    private fun getExtraRows(): Int {
-        var count = 0
-        if (isLoadingAtEnd()) ++count
-        if (isLoadingAtFront()) ++count
-        return count
-    }
-
     override fun getItemCount(): Int {
-        return super.getItemCount() + getExtraRows()
+        return super.getItemCount() + if (hasExtraRow()) 1 else 0
     }
 
-    open fun updateEndLoadingState(newPagingState: NetworkState?) {
-        if (!endLoadingIndicator || isLoadingAtFront()) return
-        val previousState = this.endLoadingState
-        val hadExtraRow = isLoadingAtEnd()
-        this.endLoadingState = newPagingState
-        val hasExtraRow = isLoadingAtEnd()
+    private fun hasExtraRow() = networkState != null && networkState != NetworkState.success
+
+    fun setNetworkState(newNetworkState: NetworkState?) {
+        val previousState = this.networkState
+        val hadExtraRow = hasExtraRow()
+        this.networkState = newNetworkState
+        val hasExtraRow = hasExtraRow()
         if (hadExtraRow != hasExtraRow) {
             if (hadExtraRow) {
-                notifyItemRemoved(itemCount + 1)
+                notifyItemRemoved(super.getItemCount())
             } else {
-                notifyItemInserted(itemCount)
+                notifyItemInserted(super.getItemCount())
             }
-        } else if (hasExtraRow && previousState != newPagingState) {
-            notifyItemChanged(itemCount)
+        } else if (hasExtraRow && previousState != newNetworkState) {
+            notifyItemChanged(itemCount - 1)
         }
     }
-
-    open fun updateFrontLoadingState(newPagingState: NetworkState?) {
-        if (!frontLoadingIndicator || isLoadingAtEnd()) return
-        val previousState = this.frontLoadingState
-        val hadExtraRow = isLoadingAtFront()
-        this.frontLoadingState = newPagingState
-        val hasExtraRow = isLoadingAtFront()
-        if (hadExtraRow != hasExtraRow) {
-            if (hadExtraRow) {
-                notifyItemRemoved(0)
-            } else {
-                notifyItemInserted(0)
-            }
-        } else if (hasExtraRow && previousState != newPagingState) {
-            notifyItemChanged(0)
-        }
-    }
-
 
     final override fun getItemViewType(position: Int): Int {
-        return if (isLoadingAtEnd() && position == itemCount - getExtraRows()) {
-            END_LOADING_INDICATOR
-        } else if (isLoadingAtFront() && position == 0) {
-            FRONT_LOADING_INDICATOR
+        return if (hasExtraRow() && position == itemCount - 1) {
+            LOADING_INDICATOR
         } else {
             getCustomItemViewType(position)
         }
